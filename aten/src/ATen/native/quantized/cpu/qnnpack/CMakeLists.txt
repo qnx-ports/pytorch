@@ -61,7 +61,7 @@ endif()
 
 if(NOT CMAKE_SYSTEM_NAME)
   message(FATAL_ERROR "CMAKE_SYSTEM_NAME not defined")
-elseif(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|Linux|Android)$")
+elseif(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|Linux|Android|QNX)$")
   message(FATAL_ERROR "Unrecognized CMAKE_SYSTEM_NAME = ${CMAKE_SYSTEM_NAME}")
 endif()
 
