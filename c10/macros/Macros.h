@@ -282,11 +282,19 @@ __host__ __device__
         const char* function) throw();
 }
 #endif // NDEBUG
+#if defined(__QNX__) // Temporary. We still need to support compiling with Musl.
+#define CUDA_KERNEL_ASSERT(cond)                                         \
+  if (C10_UNLIKELY(!(cond))) {                                           \
+    __assert(                                                       \
+        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+  }
+#else
 #define CUDA_KERNEL_ASSERT(cond)                                         \
   if (C10_UNLIKELY(!(cond))) {                                           \
     __assert_fail(#cond, __FILE__, static_cast<unsigned int>(__LINE__),  \
                   __func__);                                             \
   }
+#endif // __QNX__
 #endif // __APPLE__
 
 #ifdef __APPLE__

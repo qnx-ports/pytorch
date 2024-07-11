@@ -11,13 +11,17 @@ set -e
 export BUILD_PYTORCH_MOBILE_WITH_HOST_TOOLCHAIN=1
 CAFFE2_ROOT="$( cd "$(dirname "$0")"/.. ; pwd -P)"
 
-if [ -z ${TOOLCHAIN_PATH+x} ]; then
-  TOOLCHAIN_PATH=$CAFFE2_ROOT
+if [ -z ${QNX_DIR+x} ]; then
+  QNX_DIR=$CAFFE2_ROOT
+fi
+
+if [ -z ${TEST+x} ]; then
+  TEST="OFF"
 fi
 
 echo "Bash: $(/bin/bash --version | head -1)"
 echo "Caffe2 path: $CAFFE2_ROOT"
-echo "Toolchain path: $TOOLCHAIN_PATH"
+echo "Toolchain path: $QNX_DIR"
 
 CMAKE_ARGS=()
 CMAKE_ARGS+=("-DCMAKE_PREFIX_PATH=$(python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')")
@@ -42,7 +46,8 @@ if [ -x "$(command -v ninja)" ]; then
 fi
 
 # Don't build artifacts we don't need
-CMAKE_ARGS+=("-DBUILD_TEST=OFF")
+CMAKE_ARGS+=("-DBUILD_TEST=${TEST}")
+CMAKE_ARGS+=("-DINSTALL_TEST=OFF")
 CMAKE_ARGS+=("-DBUILD_BINARY=OFF")
 
 # If there exists env variable and it equals to 1, build lite interpreter.
@@ -94,13 +99,13 @@ CMAKE_ARGS+=("-DBUILD_QNX_ASM_FLAGS=-D_QNX_SOURCE")
 CMAKE_ARGS+=("-DBUILD_QNX_C_FLAGS=-D_QNX_SOURCE")
 CMAKE_ARGS+=("-DBUILD_QNX_CXX_FLAGS=-D_QNX_SOURCE")
 CMAKE_ARGS+=("-DBUILD_QNX_LINKER_FLAGS=-Wl,--build-id=md5")
-CMAKE_ARGS+=("-DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_PATH/qnx.nto.toolchain.cmake")
+CMAKE_ARGS+=("-DCMAKE_TOOLCHAIN_FILE=$QNX_DIR/qnx.nto.toolchain.cmake")
 CMAKE_ARGS+=("-DCMAKE_SYSTEM_PROCESSOR=aarch64")
 CMAKE_ARGS+=("-DCMAKE_ASM_COMPILER_TARGET=gcc_ntoaarch64le")
 CMAKE_ARGS+=("-DCMAKE_C_COMPILER_TARGET=gcc_ntoaarch64le")
 CMAKE_ARGS+=("-DCMAKE_CXX_COMPILER_TARGET=gcc_ntoaarch64le")
-CMAKE_ARGS+=("-DCAFFE2_CUSTOM_PROTOC_EXECUTABLE=$TOOLCHAIN_PATH/host/protobuf/install/bin/protoc")
-CMAKE_ARGS+=("-DNATIVE_BUILD_DIR=$TOOLCHAIN_PATH/host/sleef")
+CMAKE_ARGS+=("-DCAFFE2_CUSTOM_PROTOC_EXECUTABLE=$QNX_DIR/host/protobuf/install/bin/protoc")
+CMAKE_ARGS+=("-DNATIVE_BUILD_DIR=$QNX_DIR/host/sleef")
 
 # User-specified CMake arguments go last to allow overridding defaults
 CMAKE_ARGS+=("$@")
@@ -116,7 +121,7 @@ cd $BUILD_ROOT
 cmake "$CAFFE2_ROOT" \
     -DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX \
     -DCMAKE_BUILD_TYPE=Release \
-    "${CMAKE_ARGS[@]}"
+    "${CMAKE_ARGS[@]}" \
 
 # Cross-platform parallel build
 if [ -z "$MAX_JOBS" ]; then
@@ -128,5 +133,5 @@ if [ -z "$MAX_JOBS" ]; then
 fi
 
 echo "Will install headers and libs to $INSTALL_PREFIX for further project usage."
-cmake --build . --target install -- "-j${MAX_JOBS}"
+cmake --build . --target install "-j${MAX_JOBS}" 2>> log.txt
 echo "Installation completed, now you can copy the headers/libs from $INSTALL_PREFIX to your project directory."
