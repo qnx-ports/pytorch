@@ -37,8 +37,14 @@ TEST(ExceptionTest, TORCH_INTERNAL_ASSERT_DEBUG_ONLY) {
 #if !defined(__ANDROID__) && !defined(__APPLE__) && \
     !(defined(USE_ROCM) && ROCM_VERSION < 40100)
 TEST(ExceptionTest, CUDA_KERNEL_ASSERT) {
+  // On this platform there is no __assert_fail
+#if defined(__QNX__)
+  // This function always throws even in NDEBUG mode
+  ASSERT_DEATH_IF_SUPPORTED({ CUDA_KERNEL_ASSERT(false); }, "");
+#else
   // This function always throws even in NDEBUG mode
   ASSERT_DEATH_IF_SUPPORTED({ CUDA_KERNEL_ASSERT(false); }, "Assert");
+#endif
 }
 #endif
 
