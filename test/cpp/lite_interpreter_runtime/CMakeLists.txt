@@ -8,14 +8,14 @@ set(LITE_INTERPRETER_RUNTIME_TEST_DIR
 )
 
 if(QNX)
-add_library(backend_with_compiler_runtime SHARED
-        ${TORCH_ROOT}/test/cpp/jit/test_backend_compiler_lib.cpp
-        )
+  add_library(backend_with_compiler_runtime SHARED
+          ${TORCH_ROOT}/test/cpp/jit/test_backend_compiler_lib.cpp
+          )
 else()
-add_library(backend_with_compiler_runtime SHARED
-        ${TORCH_ROOT}/test/cpp/jit/test_backend_compiler_lib.cpp
-        ${TORCH_ROOT}/torch/csrc/jit/backends/backend_interface.cpp
-        )
+  add_library(backend_with_compiler_runtime SHARED
+          ${TORCH_ROOT}/test/cpp/jit/test_backend_compiler_lib.cpp
+          ${TORCH_ROOT}/torch/csrc/jit/backends/backend_interface.cpp
+          )
 endif()
 target_link_libraries(backend_with_compiler_runtime PRIVATE torch)
 
