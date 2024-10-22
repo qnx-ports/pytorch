@@ -1006,7 +1006,7 @@ graph():
             def foo_impl(a, b):
                 return a + b
 
-            @torch.library.register_fake("mylib::foo")
+            @torch.library.register_fake("mylib::foo", lib=lib)
             def foo_fake_impl(a, b):
                 m, n = a.shape
                 return torch.empty(n, m)  # incorrectly permute
@@ -1086,15 +1086,14 @@ graph():
             def foo_impl(a):
                 return a * 2
 
-            @torch.library.register_fake("mylib::foo_alias")
+            @torch.library.register_fake("mylib::foo_alias", lib=lib)
             def foo_fake_impl(a):
                 return a
 
             with torch._functorch.config.patch(fake_tensor_propagate_real_tensors=True):
                 with self.assertRaisesRegex(
                     error_type,
-                    "Real tensor propagation found an aliasing mismatch between fake output "
-                    "and real output for func: mylib.foo_alias.default",
+                    "Real tensor propagation found mismatch in outputs_alias_inputs check"
                 ):
                     ep = export(M(), (torch.randn(4, 4),))
 
@@ -1107,7 +1106,7 @@ graph():
             def foo_impl(a):
                 return a * 2
 
-            @torch.library.register_fake("mylib::foo_dtype")
+            @torch.library.register_fake("mylib::foo_dtype", lib=lib)
             def foo_fake_impl(a):
                 m, n = a.shape
                 return torch.empty([m, n], dtype=torch.int32)
@@ -1115,8 +1114,7 @@ graph():
             with torch._functorch.config.patch(fake_tensor_propagate_real_tensors=True):
                 with self.assertRaisesRegex(
                     error_type,
-                    "Real tensor propagation found an output tensor metadata mismatch, between fake output "
-                    r"(.*\n)*.* and real output (.*\n)*.* at output index 0, for func: mylib.foo_dtype.default",
+                    "Dtypes torch.int32 and torch.float32 are not equal"
                 ):
                     ep = export(N(), (torch.randn(4, 4),))
 
