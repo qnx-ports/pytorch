@@ -20,7 +20,6 @@ from typing import (
     TYPE_CHECKING,
     Union,
 )
-
 from typing_extensions import deprecated, TypeAlias
 
 

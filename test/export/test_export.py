@@ -993,6 +993,8 @@ graph():
         self.assertTrue(torch.allclose(model(x), ep_model(x)))
 
     def test_real_tensor_size_mismatch(self):
+        from torch._subclasses.fake_tensor import FakeRealKernelMismatchException
+
         with torch.library._scoped_library("mylib", "FRAGMENT") as lib:
             torch.library.define(
                 "mylib::foo",
@@ -1015,7 +1017,7 @@ graph():
                 return torch.empty(n, m)  # incorrectly permute
 
             error_type = (
-                AssertionError
+                FakeRealKernelMismatchException
                 if is_non_strict_test(self._testMethodName)
                 else torch._dynamo.exc.TorchRuntimeError
             )
@@ -1061,6 +1063,8 @@ graph():
                     )
 
     def test_real_tensor_alias_dtype_mismatch(self):
+        from torch._subclasses.fake_tensor import FakeRealKernelMismatchException
+
         with torch.library._scoped_library("mylib", "FRAGMENT") as lib:
             torch.library.define(
                 "mylib::foo_alias",
@@ -1075,7 +1079,7 @@ graph():
                 lib=lib,
             )
             error_type = (
-                AssertionError
+                FakeRealKernelMismatchException
                 if is_non_strict_test(self._testMethodName)
                 else torch._dynamo.exc.TorchRuntimeError
             )
@@ -1096,7 +1100,8 @@ graph():
             with torch._functorch.config.patch(fake_tensor_propagate_real_tensors=True):
                 with self.assertRaisesRegex(
                     error_type,
-                    "Real tensor propagation found mismatch in outputs_alias_inputs check"
+                    r"Real tensor propagation found an aliasing mismatch between fake output (.*\n)*.* "
+                    r"and real output (.*\n)*.* for func: mylib.foo_alias.default"
                 ):
                     ep = export(M(), (torch.randn(4, 4),))
 
@@ -1117,11 +1122,11 @@ graph():
             with torch._functorch.config.patch(fake_tensor_propagate_real_tensors=True):
                 with self.assertRaisesRegex(
                     error_type,
-                    "Dtypes torch.int32 and torch.float32 are not equal"
+                    r"Real tensor propagation found a metadata mismatch between fake tensor (.*\n)*.* "
+                    r"and real tensor (.*\n)*.* at output index 0, for func: mylib.foo_dtype.default"
                 ):
                     ep = export(N(), (torch.randn(4, 4),))
 
-    @testing.expectedFailureTrainingIRToRunDecompNonStrict  # TODO(pianpwk): user_output signature
     def test_real_tensor_for_max_op(self):
         class Foo(torch.nn.Module):
             def forward(self, x, y):

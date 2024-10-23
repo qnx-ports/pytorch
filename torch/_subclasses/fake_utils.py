@@ -113,13 +113,11 @@ def _check_fake_real_tensors(
             f"for your operator at a dispatch key other than Autograd, "
             f"which will lead to problems"
         )
-    
+
     if torch._C._has_storage(real_out):
         r_offset = real_out.storage_offset()
         f_offset = fake_out.storage_offset()
-        assert (
-            r_offset == f_offset
-        ), f"{context} mismatched storage offset"
+        assert r_offset == f_offset, f"{context} mismatched storage offset"
 
     torch._prims.utils.compare_tensor_meta(
         real_out,
@@ -193,7 +191,9 @@ class CrossRefFakeMode(TorchDispatchMode):
             ), f"{context} mismatch in number of returns {len(f_flat)} != {len(r_flat)}"
 
             if self.check_aliasing:
-                _check_alias_info(context, r, (args, kwargs), fake_r, (fake_args, fake_kwargs))
+                _check_alias_info(
+                    context, r, (args, kwargs), fake_r, (fake_args, fake_kwargs)
+                )
 
             for idx, (r_out, f_out) in enumerate(
                 zip(pytree.tree_leaves(r), pytree.tree_leaves(fake_r))
