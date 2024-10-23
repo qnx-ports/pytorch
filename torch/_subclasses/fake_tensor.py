@@ -2128,7 +2128,7 @@ class FakeTensorMode(TorchDispatchMode):
                         try:
                             _check_fake_real_vals(_fake_out, _real_out)
                         except AssertionError as exc:
-                            raise AssertionError(
+                            raise FakeRealKernelMismatchException(
                                 f"Real tensor propagation found an output value mismatch between "
                                 f"fake output value {_fake_out} and real output value {_real_out}, "
                                 f" at output index {i}, for func: {func}"
