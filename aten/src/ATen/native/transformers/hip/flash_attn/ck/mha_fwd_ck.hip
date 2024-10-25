@@ -295,15 +295,11 @@ mha_fwd_ck(const at::Tensor &q,                      // batch_size x seqlen_q x 
 
         hipLaunchKernelGGL(
             flash::ParsePhiloxCudaState, dim3(1), dim3(64), 0, at::hip::getCurrentHIPStreamMasqueradingAsCUDA(), philox_args, rng_state_ptr);
-		//TODO ANDY: need to figure out what to do with the seed and dropout values that we get from 
-		// the GPU KERNEL and decide how we want to tensor-ize them
-		// research CUDAGeneratorImpl which has gen, which has ->philox_cuda_state
         seed_t = at::scalar_tensor(at::Scalar(static_cast<uint64_t>(rng_state_ptr[0])), at::dtype(at::kLong));
         offset_t = at::scalar_tensor(at::Scalar(static_cast<uint64_t>(rng_state_ptr[1])), at::dtype(at::kLong));
     }
     else
     {
-		// TODO ANDY IF THINGS START TO LOOK WEIRD, RE-EXAMINE HERE
         seed_t = at::empty({}, at::dtype(at::kLong).device(at::kCUDA));
         offset_t = at::empty({}, at::dtype(at::kLong).device(at::kCUDA));
     }

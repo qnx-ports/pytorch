@@ -192,7 +192,6 @@ if(USE_FLASH_ATTENTION)
   list(APPEND native_transformers_hip_hip ${flash_attention_hip_ck_hip})
   list(APPEND native_transformers_hip_hip ${flash_attention_hip_aot_hip})
   list(APPEND native_transformers_src_hip_hip ${flash_attention_src_hip_hip})
-
 endif()
 
 if(USE_MEM_EFF_ATTENTION)

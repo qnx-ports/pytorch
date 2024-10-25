@@ -4,9 +4,6 @@
 
 #pragma once
 
-// Include these 2 headers instead of torch/extension.h since we don't need all of the torch headers.
-//#include <torch/python.h>
-//#include <torch/nn/functional.h>
 #include <ATen/TensorIndexing.h>
 #include <ATen/hip/HIPContext.h>
 #include <ATen/hip/impl/HIPGuardImplMasqueradingAsCUDA.h>
@@ -19,7 +16,6 @@
 #include <ATen/ops/reshape.h>
 #include <ATen/ops/scalar_tensor.h>
 #include <ATen/ops/sum.h>
-//#include <ATen/ops/slice.h>
 #include <ATen/ops/narrow.h>
 #include <ATen/ops/pad.h>
 #include <ATen/ops/zeros.h>
