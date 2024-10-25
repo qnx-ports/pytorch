@@ -269,7 +269,7 @@ _ROCmFABackends = {
     "aotriton": torch._C._ROCmFABackend.AOTriton,
     "ck": torch._C._ROCmFABackend.Ck,
 }
-_ROCmFABackends_str = ", ",join(_ROCmFABackends.keys())
+_ROCmFABackends_str = ", ".join(_ROCmFABackends.keys())
 
 
 from torch._C import _SDPAParams as SDPAParams, _SDPBackend as SDPBackend
@@ -306,10 +306,10 @@ def preferred_rocm_fa_library(
                 "Unknown input value. " f"Choose from: {_ROCmFABackends_str}."
             )
         torch._C._set_rocm_fa_preferred_backend(_ROCmFABackends[backend])
-    elif isinstance(backend, torch._C._BlasBackend):
-        torch._C._set_blas_preferred_backend(backend)
+    elif isinstance(backend, torch._C._ROCmFABackend):
+        torch._C._set_rocm_fa_preferred_backend(backend)
     else:
-        raise RuntimeError("Unknown input value. " f"Choose from: {_ROCmFAbackends_str}."
+        raise RuntimeError("Unknown input value. " f"Choose from: {_ROCmFAbackends_str}.")
 
     return torch._C._get_rocm_fa_preferred_backend()
 
