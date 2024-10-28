@@ -10,7 +10,7 @@ namespace at {
 enum class ROCmFABackend : int8_t { Default, AOTriton, Ck };
 
 inline std::string ROCmFABackendToString(at::ROCmFABackend backend) {
-  switch(backend) {
+  switch (backend) {
     case ROCmFABackend::Default:
       return "at::ROCmFABackend::Default";
     case ROCmFABackend::AOTriton:
@@ -22,9 +22,10 @@ inline std::string ROCmFABackendToString(at::ROCmFABackend backend) {
   }
 }
 
-inline std::ostream& operator<<(std::ostream& stream, at::ROCmFABackend backend) {
+inline std::ostream& operator<<(
+    std::ostream& stream,
+    at::ROCmFABackend backend) {
   return stream << ROCmFABackendToString(backend);
 }
-
 
 } // namespace at

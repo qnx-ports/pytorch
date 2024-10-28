@@ -105,9 +105,9 @@
 #include <sstream>
 
 #ifdef USE_CUDA
+#include <ATen/ROCmFABackend.h>
 #include <ATen/cuda/CUDAConfig.h>
 #include <ATen/native/transformers/cuda/sdp_utils.h>
-#include <ATen/ROCmFABackend.h>
 #ifdef __HIP_PLATFORM_AMD__
 #include <ATen/native/cudnn/hip/BatchNorm.h>
 #else
@@ -2102,8 +2102,6 @@ Call this whenever a new thread is created in order to propagate values from
   py_module.def("_get_rocm_fa_preferred_backend", []() {
     return at::globalContext().getROCmFAPreferredBackend();
   });
-
-
 
   py_module.def(
       "_construct_storage_from_data_pointer",
