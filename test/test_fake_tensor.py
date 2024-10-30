@@ -28,7 +28,7 @@ from torch._subclasses.fake_tensor import (
     _CacheKeyState,
     DynamicOutputShapeException,
     extract_tensor_metadata,
-    FakeRealKernelMismatchException,
+    FakeCrossRefException,
     FakeTensor,
     FakeTensorConverter,
     FakeTensorMode,
@@ -1378,17 +1378,20 @@ class FakeTensorOperatorInvariants(TestCase):
             try:
                 with torch._subclasses.CrossRefFakeMode():
                     Repro()(*args)
-            except FakeRealKernelMismatchException as e:
+            except FakeCrossRefException as e:
                 # We expect the cross ref to succed for the first output to fail
                 # for the rng state, see Note [Seed and Offset]
-                self.assertTrue(
-                    self.__class__.__name__.startswith("PropagateRealTensors")
-                )
                 self.assertTrue("output[0]" not in str(e))
-                self.assertTrue(
-                    "Real tensor propagation found a metadata mismatch"
-                    in str(e)
-                )
+                if self.__class__.__name__.startswith("PropagateRealTensors"):
+                    self.assertTrue(
+                        "Real tensor propagation found a metadata mismatch"
+                        in str(e)
+                    )
+                else:
+                    self.assertTrue(
+                        "found mismatched tensor metadata for output"
+                        in str(e)
+                    )
 
     # IMPORTANT!!! Always run even if CUDA is not available
     def test_fake_gpu_no_init(self):

@@ -140,7 +140,7 @@ class UnsupportedOperatorException(RuntimeError):
 
 
 @dataclass
-class FakeRealKernelMismatchException(RuntimeError):
+class FakeCrossRefException(RuntimeError):
     reason: str
 
 
@@ -2102,8 +2102,8 @@ class FakeTensorMode(TorchDispatchMode):
                         fake_out,
                         (args, kwargs),
                     )
-                except AssertionError as exc:
-                    raise FakeRealKernelMismatchException(
+                except FakeCrossRefException as exc:
+                    raise FakeCrossRefException(
                         f"Real tensor propagation found an aliasing mismatch between "
                         f"fake output {fake_out} and real output {real_out}, "
                         f" for func: {func}"
@@ -2125,7 +2125,7 @@ class FakeTensorMode(TorchDispatchMode):
                                 requires_grad=False,  # issues with FakeTensorConverter preserving requires_grad
                             )
                         except (AssertionError, RuntimeError) as exc:
-                            raise FakeRealKernelMismatchException(
+                            raise FakeCrossRefException(
                                 f"Real tensor propagation found a metadata mismatch between "
                                 f"fake tensor {_fake_out} and real tensor {_real_out}, "
                                 f" at output index {i}, for func: {func}"
@@ -2137,7 +2137,7 @@ class FakeTensorMode(TorchDispatchMode):
                             try:
                                 _check_fake_real_vals(s_fake, s_real)
                             except AssertionError as exc:
-                                raise FakeRealKernelMismatchException(
+                                raise FakeCrossRefException(
                                     f"Real tensor propagation found an output size mismatch between "
                                     f"fake shape {s_fake} and real shape {s_real}, at output "
                                     f"index {i}, dimension {j} for func: {func}"
@@ -2146,7 +2146,7 @@ class FakeTensorMode(TorchDispatchMode):
                         try:
                             _check_fake_real_vals(_fake_out, _real_out)
                         except AssertionError as exc:
-                            raise FakeRealKernelMismatchException(
+                            raise FakeCrossRefException(
                                 f"Real tensor propagation found an output value mismatch between "
                                 f"fake output value {_fake_out} and real output value {_real_out}, "
                                 f" at output index {i}, for func: {func}"

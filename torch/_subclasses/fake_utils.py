@@ -8,6 +8,7 @@ import torch
 import torch.utils._pytree as pytree
 from torch._ops import OpOverload
 from torch._subclasses.fake_tensor import (
+    FakeCrossRefException,
     FakeTensor,
     FakeTensorMode,
     tree_flatten_only,
@@ -51,22 +52,25 @@ def output_alias_each_other(outputs):
 def _check_alias_info(context, real_out, real_in, fake_out, fake_in):
     r_aliasing = outputs_alias_inputs(real_out, real_in)
     f_aliasing = outputs_alias_inputs(fake_out, fake_in)
-    assert (
-        r_aliasing == f_aliasing
-    ), f"{context} mismatch in outputs_alias_inputs check {f_aliasing} != {r_aliasing}"
+    if r_aliasing != f_aliasing:
+        raise FakeCrossRefException(
+            f"{context} mismatch in outputs_alias_inputs check {f_aliasing} != {r_aliasing}"
+        )
 
     r_identity_eq = outputs_are_inputs(real_out, real_in)
     f_identity_eq = outputs_are_inputs(fake_out, fake_in)
-    assert (
-        r_identity_eq == f_identity_eq
-    ), f"{context} mismatch in outputs_are_inputs check {f_identity_eq} != {r_identity_eq}"
+    if r_identity_eq != f_identity_eq:
+        raise FakeCrossRefException(
+            f"{context} mismatch in outputs_are_inputs check {f_identity_eq} != {r_identity_eq}"
+        )
 
     r_output_alias_each_other = output_alias_each_other(real_out)
     f_output_alias_each_other = output_alias_each_other(fake_out)
-    assert r_output_alias_each_other == f_output_alias_each_other, (
-        f"{context} mismatch in outputs_alias_each_other check "
-        f"{f_output_alias_each_other} != {r_output_alias_each_other}"
-    )
+    if r_output_alias_each_other != f_output_alias_each_other:
+        raise FakeCrossRefException(
+            f"{context} mismatch in outputs_alias_each_other check "
+            f"{f_output_alias_each_other} != {r_output_alias_each_other}"
+        )
 
 
 def is_sdpa_error(func, idx, e):
@@ -175,25 +179,32 @@ def _check_fake_real_tensors(
     requires_grad=True,
 ):
     if requires_grad:
-        assert real_out.requires_grad == fake_out.requires_grad, (
-            f"{context} mismatched requires_grad-ness of outputs. "
-            f"This usually means that you have added autograd support "
-            f"for your operator at a dispatch key other than Autograd, "
-            f"which will lead to problems"
-        )
+        if real_out.requires_grad != fake_out.requires_grad:
+            raise FakeCrossRefException(
+                f"{context} mismatched requires_grad-ness of outputs. "
+                f"This usually means that you have added autograd support "
+                f"for your operator at a dispatch key other than Autograd, "
+                f"which will lead to problems"
+            )
 
     if torch._C._has_storage(real_out):
         r_offset = real_out.storage_offset()
         f_offset = fake_out.storage_offset()
-        assert r_offset == f_offset, f"{context} mismatched storage offset"
+        if r_offset != f_offset:
+            raise FakeCrossRefException(
+                f"{context} mismatched storage offset"
+            )
 
-    torch._prims.utils.compare_tensor_meta(
-        real_out,
-        fake_out,
-        check_sizes=sizes,
-        check_strides=strides,
-        allow_rhs_unbacked=True,
-    )
+    try:
+        torch._prims.utils.compare_tensor_meta(
+            real_out,
+            fake_out,
+            check_sizes=sizes,
+            check_strides=strides,
+            allow_rhs_unbacked=True,
+        )
+    except (AssertionError, RuntimeError) as exc:
+        raise FakeCrossRefException(f"{context} mismatched tensor metadata") from exc
 
 
 class CrossRefFakeMode(TorchDispatchMode):
@@ -294,5 +305,5 @@ class CrossRefFakeMode(TorchDispatchMode):
                             if len(r_flat) == 1
                             else f"{context} mismatched tensor metadata for output[{idx}]: {e}"
                         )
-                        raise RuntimeError(error_message) from e
+                        raise FakeCrossRefException(error_message) from e
         return r
