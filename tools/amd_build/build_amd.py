@@ -139,7 +139,7 @@ ignores = [
     "torch/lib/tmp_install/*",
     "torch/include/*",
     # ROCm has multiple flash attention backends requiring deviation
-    "aten/src/ATen/native/transformers/cuda/flash_attn/flash_api.h"
+    "aten/src/ATen/native/transformers/cuda/flash_attn/flash_api.h",
 ]
 
 ignores = [os.path.join(proj_dir, ignore) for ignore in ignores]

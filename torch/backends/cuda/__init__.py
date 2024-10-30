@@ -264,6 +264,7 @@ def preferred_blas_library(
 
     return torch._C._get_blas_preferred_backend()
 
+
 _ROCmFABackends = {
     "default": torch._C._ROCmFABackend.Default,
     "aotriton": torch._C._ROCmFABackend.AOTriton,
@@ -273,6 +274,7 @@ _ROCmFABackends_str = ", ".join(_ROCmFABackends.keys())
 
 
 from torch._C import _SDPAParams as SDPAParams, _SDPBackend as SDPBackend
+
 
 def preferred_rocm_fa_library(
     backend: Union[None, str, torch._C._ROCmFABackend] = None
@@ -309,9 +311,10 @@ def preferred_rocm_fa_library(
     elif isinstance(backend, torch._C._ROCmFABackend):
         torch._C._set_rocm_fa_preferred_backend(backend)
     else:
-        raise ValueError("Unknown input value. " f"Choose from: {_ROCmFAbackends_str}.")
+        raise ValueError("Unknown input value. " f"Choose from: {_ROCmFABackends_str}.")
 
     return torch._C._get_rocm_fa_preferred_backend()
+
 
 # Set the __module__ attribute
 SDPAParams.__module__ = "torch.backends.cuda"
