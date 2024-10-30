@@ -1,24 +1,36 @@
 from __future__ import annotations
 
+import base64
 import copy
 import dataclasses
 import enum
 import logging
+import os
+import pickle
 import time
 from collections import defaultdict
 from typing import DefaultDict, Optional, Tuple, TYPE_CHECKING, TypeVar, Union
 from typing_extensions import Self
 
+import torch._dynamo.config
+import torch._utils_internal
+import torch.compiler.config
 from torch._dynamo.utils import get_chromium_event_logger
+from torch._environment import is_fbcode
+from torch._inductor.remote_cache import create_cache
+from torch._logging._internal import trace_structured_artifact
 
 
 if TYPE_CHECKING:
     import types
 
     from torch._dynamo.symbolic_convert import InstructionTranslator
+    from torch._inductor.remote_cache import JsonDataTy, RemoteCache
 
 
 log = logging.getLogger(__name__)
+
+LOCK_TIMEOUT = 10
 
 # How does in memory representation work?  Concretely, this module is
 # responsible for holding GLOBAL state representing the state it holds, no
@@ -27,6 +39,45 @@ log = logging.getLogger(__name__)
 # (similar to how the filesystem doesn't get cleaned up except by tmp
 # cleaner), so the expectation is the information is relatively cheap and we
 # don't mind leaking it.
+
+
+# How does the filesystem/remote cache work?  Here are the extra knobs:
+#
+# - WORKFLOW_ID: Do we have a unique identifier for the "training run"  (such that it
+#   stays the same if we're running the same code, and changes if we're
+#   running something different).
+#
+# - RANK_SHARING: Are we sharing the cache across ranks, or does each rank get
+#   an individual cache?
+#
+# With no WORKFLOW_ID, we don't enable PGO cache by default.  This is to prevent
+# situations where unrelated invocations of PyTorch unpredictably cause
+# changes to each other's behavior.  With a WORKFLOW_ID, at least you know there
+# is some "state" associated with it.  (State dict might be another way to
+# tell if a run is related or not.)  You can opt-in to YOLO everything
+# aliases everything by passing a shared WORKFLOW_ID for all your invocations.
+#
+# So cache is per WORKFLOW_ID.  With no RANK_SHARING, there is never contention
+# between runs, so we can leisurely update a bundle with information we need.
+# Because we are grouped by WORKFLOW_ID, we can have a single consolidated bundle
+# for everything (or not; maybe worry about O(n^2) IO if we updated every
+# compile--let's just instrument this.)  Can even take a filelock for extra
+# safety (expect no contention); expect 50ns overhead from uncontended filelock.
+#
+# With RANK_SHARING, everyone is storming to modify the same cache files.
+# We can do this by having folks atomic write to a CAS-store and then having
+# readers do on-the-fly merging (this can be implemented in remote using
+# prefix iteration).  As an optional optimization, one rank can be elected to
+# handling bundling post facto (ideally, this is done async, after quiescence,
+# without compiler collective need to wait for everyone to finish writing
+# their bits.) Not sure how you can avoid a listdir because if some rank shows
+# up with some new entries we need to pull them in ASAP (unless you want to
+# delay bundling).
+#
+# With compiler collective, life is easier.  Compiler chat with each other so
+# rank 0 has collected everything.  So elect rank 0 only to write the bundle.
+# Don't even need CAS-store atomic write; just one rank writing an updating
+# bundles.  So maybe don't bother with RANK_SHARING in that case.
 
 
 @dataclasses.dataclass(frozen=True)
@@ -47,7 +98,8 @@ class CodeState:
     )
 
 
-CODE_STATE: DefaultDict[CodeId, CodeState] = defaultdict(CodeState)
+_INIT_CODE_STATE: Optional[DefaultDict[CodeId, CodeState]] = None
+_CODE_STATE: Optional[DefaultDict[CodeId, CodeState]] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -195,7 +247,7 @@ def update_automatic_dynamic(
     is_unspecialized_nn_module: bool = False,
 ) -> FrameStateSizeEntry:
     code_id = CodeId.make(tx.f_code)
-    frame_state = CODE_STATE[code_id]
+    frame_state = get_code_state()[code_id]
     is_update = name in frame_state.automatic_dynamic
     mut_entry = frame_state.automatic_dynamic[name]
     old_entry = copy.copy(mut_entry)
@@ -330,3 +382,208 @@ def process_automatic_dynamic(
                 )
         assert res is not None
         return res
+
+
+def get_workflow_id() -> Optional[str]:
+    # TODO: info versions of these logs that log only once
+    if torch._inductor.config.force_disable_caches:
+        log.debug(
+            "automatic_dynamic_local_pgo force disabled by torch._inductor.config.force_disable_caches"
+        )
+        return None
+
+    if (r := torch.compiler.config.workflow_id) is not None:
+        return "user_" + r
+
+    if (r := torch._utils_internal.get_workflow_id()) is not None:
+        return "mast_" + r
+
+    return None
+
+
+# NB: This currently also controls if pgo is enabled at all
+def code_state_path(workflow_id: str) -> Optional[str]:
+    if not torch._dynamo.config.automatic_dynamic_local_pgo:
+        log.debug("automatic_dynamic_local_pgo not enabled")
+        return None
+
+    from torch._inductor.runtime.runtime_utils import cache_dir
+
+    return os.path.join(cache_dir(), "dynamo", f"code_state_{workflow_id}.pkl")
+
+
+def should_use_remote_dynamo_pgo_cache() -> bool:
+    if torch._inductor.config.force_disable_caches:
+        return False
+
+    if (r := torch._dynamo.config.automatic_dynamic_remote_pgo) is not None:
+        return r
+
+    if not is_fbcode():
+        return False
+
+    if torch._utils_internal.is_fb_unit_test():
+        return False
+
+    try:
+        from torch._inductor.fb.remote_cache import REMOTE_CACHE_VERSION
+    except ModuleNotFoundError:
+        return False
+
+    return REMOTE_CACHE_VERSION >= torch._utils_internal.justknobs_getval_int(
+        "pytorch/remote_cache:dynamo_pgo_version"
+    )
+
+
+def get_remote_cache() -> Optional[RemoteCache[JsonDataTy]]:
+    if not should_use_remote_dynamo_pgo_cache():
+        return None
+
+    return create_cache(
+        "dynamo-pgo",
+        is_fbcode(),
+        "FbRemoteDynamoPGOCache",
+        "RemoteDynamoPGOCache",
+    )
+
+
+def get_code_state() -> DefaultDict[CodeId, CodeState]:
+    global _CODE_STATE, _INIT_CODE_STATE
+    if _CODE_STATE is not None:
+        return _CODE_STATE
+
+    # Initialize it (even if we don't look up profile)
+    _CODE_STATE = defaultdict(CodeState)
+
+    workflow_id = get_workflow_id()
+    if workflow_id is None:
+        return _CODE_STATE
+
+    def hit(ty: str) -> DefaultDict[CodeId, CodeState]:
+        global _INIT_CODE_STATE
+        assert isinstance(_CODE_STATE, defaultdict)
+        log.info("get_code_state %s hit %s, %d entries", path, ty, len(_CODE_STATE))
+        trace_structured_artifact(
+            "get_code_state",
+            "string",
+            lambda: repr(_CODE_STATE),
+        )
+        _INIT_CODE_STATE = copy.deepcopy(_CODE_STATE)
+        return _CODE_STATE
+
+    # Attempt local
+    path = code_state_path(workflow_id)
+    if path is not None and os.path.exists(path):
+        # Read lock not necessary as we always write atomically write to
+        # the actual location
+        with open(path, "rb") as f:
+            try:
+                _CODE_STATE = pickle.load(f)
+            except Exception:
+                log.warning(
+                    "get_code_state failed while reading %s", path, exc_info=True
+                )
+            else:
+                return hit("local")
+
+    # Attempt remote
+    remote_cache = get_remote_cache()
+    if remote_cache is not None:
+        # TODO: I don't really understand why there's a JSON container format
+        try:
+            cache_data = remote_cache.get(workflow_id)
+            assert isinstance(cache_data, dict)
+            data = cache_data["data"]
+            assert isinstance(data, str)
+            payload = base64.b64decode(data)
+            _CODE_STATE = pickle.loads(payload)
+        except Exception:
+            log.warning(
+                "get_code_state failed remote read on %s", workflow_id, exc_info=True
+            )
+        else:
+            return hit("remote")
+
+    log.info("get_code_state using default")
+
+    assert _CODE_STATE is not None
+    return _CODE_STATE
+
+
+def put_code_state() -> None:
+    if _CODE_STATE is None:
+        log.info("put_code_state: never initialized, will not write")
+        return
+
+    if _CODE_STATE == _INIT_CODE_STATE:
+        log.info("put_code_state: no change, skipping")
+        return
+
+    workflow_id = get_workflow_id()
+    if workflow_id is None:
+        log.info("put_code_state: no workflow id, skipping")
+        return
+
+    put_local_code_state(workflow_id)
+    put_remote_code_state(workflow_id)
+
+
+def put_local_code_state(workflow_id: str) -> None:
+    assert _CODE_STATE is not None
+
+    path = code_state_path(workflow_id)
+
+    if path is None:
+        log.info("put_code_state: local cache disabled")
+        return
+
+    tmp_path = path + ".tmp"
+    lock_path = path + ".lock"
+    # We /mostly/ don't need the lock but the tmp file could be clobbered
+    # TODO: use a safe tempfile create to eliminate lock
+    from filelock import FileLock
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    with FileLock(lock_path, timeout=LOCK_TIMEOUT):
+        with open(tmp_path, "wb") as f:
+            pickle.dump(_CODE_STATE, f)
+        os.rename(tmp_path, path)
+        log.info("put_code_state: wrote local %s, %d entries", path, len(_CODE_STATE))
+        trace_structured_artifact(
+            "put_code_state",
+            "string",
+            lambda: repr(_CODE_STATE),
+        )
+
+
+def put_remote_code_state(workflow_id: str) -> None:
+    assert _CODE_STATE is not None
+
+    remote_cache = get_remote_cache()
+
+    if remote_cache is None:
+        log.info("put_code_state: remote cache disabled")
+        return
+
+    content = pickle.dumps(_CODE_STATE)
+    cache_data: JsonDataTy = {
+        "data": base64.b64encode(content).decode("ascii"),
+    }
+    remote_cache.put(workflow_id, cache_data)
+    log.info(
+        "put_code_state: wrote remote %s, %d entries", workflow_id, len(_CODE_STATE)
+    )
+    # TODO: don't log this multiple times
+    trace_structured_artifact(
+        "put_code_state",
+        "string",
+        lambda: repr(_CODE_STATE),
+    )
+
+
+# NB: this does NOT reset the cached code state on disk
+def reset_code_state() -> None:
+    global _CODE_STATE, _INIT_CODE_STATE
+    _CODE_STATE = None
+    _INIT_CODE_STATE = None
