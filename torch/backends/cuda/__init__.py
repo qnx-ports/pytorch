@@ -309,7 +309,7 @@ def preferred_rocm_fa_library(
     elif isinstance(backend, torch._C._ROCmFABackend):
         torch._C._set_rocm_fa_preferred_backend(backend)
     else:
-        raise RuntimeError("Unknown input value. " f"Choose from: {_ROCmFAbackends_str}.")
+        raise ValueError("Unknown input value. " f"Choose from: {_ROCmFAbackends_str}.")
 
     return torch._C._get_rocm_fa_preferred_backend()
 
