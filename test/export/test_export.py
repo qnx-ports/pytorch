@@ -1057,7 +1057,7 @@ graph():
         self.assertTrue(torch.allclose(model(x), ep_model(x)))
 
     def test_real_tensor_size_mismatch(self):
-        from torch._subclasses.fake_tensor import FakeCrossRefException
+        from torch._subclasses.fake_tensor import TensorCrossRefException
 
         class M(torch.nn.Module):
             def forward(self, a, b):
@@ -1073,7 +1073,7 @@ graph():
             return torch.empty(n, m)  # incorrectly permute
 
         error_type = (
-            FakeCrossRefException
+            TensorCrossRefException
             if is_non_strict_test(self._testMethodName)
             else torch._dynamo.exc.TorchRuntimeError
         )
@@ -1119,10 +1119,10 @@ graph():
                 )
 
     def test_real_tensor_alias_dtype_mismatch(self):
-        from torch._subclasses.fake_tensor import FakeCrossRefException
+        from torch._subclasses.fake_tensor import TensorCrossRefException
 
         error_type = (
-            FakeCrossRefException
+            TensorCrossRefException
             if is_non_strict_test(self._testMethodName)
             else torch._dynamo.exc.TorchRuntimeError
         )
@@ -1144,7 +1144,7 @@ graph():
             with self.assertRaisesRegex(
                 error_type,
                 r"Real tensor propagation found an aliasing mismatch between fake output (.*\n)*.* "
-                r"and real output (.*\n)*.* for func: mylib.foo_alias.default"
+                r"and real output (.*\n)*.* for func: mylib.foo_alias.default",
             ):
                 ep = export(M(), (torch.randn(4, 4),))
 
@@ -1166,7 +1166,7 @@ graph():
             with self.assertRaisesRegex(
                 error_type,
                 r"Real tensor propagation found a metadata mismatch between fake tensor (.*\n)*.* "
-                r"and real tensor (.*\n)*.* at output index 0, for func: mylib.foo_dtype.default"
+                r"and real tensor (.*\n)*.* at output index 0, for func: mylib.foo_dtype.default",
             ):
                 ep = export(N(), (torch.randn(4, 4),))
 
