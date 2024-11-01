@@ -97,14 +97,14 @@ index 2cd164693e..796a4a51f7 100644
  #endif
  
 diff --git a/c10/macros/Macros.h b/c10/macros/Macros.h
-index 8c0dfea6e2..bd5c16dd7e 100644
+index 8c0dfea6e2..2f906cc88d 100644
 --- a/c10/macros/Macros.h
 +++ b/c10/macros/Macros.h
 @@ -397,6 +397,18 @@ __host__ __device__
  #define CUDA_KERNEL_ASSERT(cond)
  #define SYCL_KERNEL_ASSERT(cond)
  #else
-+#if defined(__QNX__) // Temporary. We still need to support compiling with Musl.
++#if defined(__QNX__)
 +#define CUDA_KERNEL_ASSERT(cond)                                         \
 +  if (C10_UNLIKELY(!(cond))) {                                           \
 +    __assert(                                                       \
@@ -195,6 +195,21 @@ index af810a780d..86a95c054e 100644
      // std::abs is already constexpr by gcc
      auto abs_c = std::abs(c);
      auto abs_d = std::abs(d);
+diff --git a/caffe2/CMakeLists.txt b/caffe2/CMakeLists.txt
+index a6b6f0f7d1..eb6bc16270 100644
+--- a/caffe2/CMakeLists.txt
++++ b/caffe2/CMakeLists.txt
+@@ -1551,6 +1551,10 @@ if(MSVC AND BUILD_SHARED_LIBS)
+   target_compile_options(torch_cpu PRIVATE "-DONNX_BUILD_MAIN_LIB")
+ endif()
+ 
++if(QNX)
++  target_compile_options(torch_cpu PRIVATE "-Wno-error=nonnull")
++endif()
++
+ caffe2_interface_library(torch_cpu torch_cpu_library)
+ 
+ if(USE_CUDA)
 diff --git a/cmake/Dependencies.cmake b/cmake/Dependencies.cmake
 index a96075245a..69b88fe035 100644
 --- a/cmake/Dependencies.cmake
@@ -582,6 +597,12 @@ index 5ab3232f6a..b83fc7528f 100644
  
  target_compile_definitions(test_codegen_unboxing PRIVATE USE_GTEST)
  
+diff --git a/third_party/kineto b/third_party/kineto
+--- a/third_party/kineto
++++ b/third_party/kineto
+@@ -1 +1 @@
+-Subproject commit 3f30237e868ca92b46b309da17d84b37be373a6e
++Subproject commit 3f30237e868ca92b46b309da17d84b37be373a6e-dirty
 diff --git a/tools/setup_helpers/env.py b/tools/setup_helpers/env.py
 index d87e97a2bb..98eb9a03da 100644
 --- a/tools/setup_helpers/env.py
