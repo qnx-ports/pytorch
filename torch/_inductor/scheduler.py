@@ -412,12 +412,9 @@ class BaseSchedulerNode:
         }
 
         ordered_reads = sorted(self.read_writes.reads, key=lambda x: x.name)
-        # NOTE remove V.graph.removed_operations once deps issue is fixed
         inconsequential_nodes = (
-            (self.ancestors - {self.get_name()})
-            | V.graph.removed_operations
-            | self.scheduler.completed_operations
-        )
+            self.ancestors - {self.get_name()}
+        ) | self.scheduler.completed_operations
 
         for buf in self.get_outputs():
             buf_node = buf.node
@@ -2169,6 +2166,11 @@ class Scheduler:
                 # dead code
                 log.debug("removed dead operation: %s", node.get_name())
                 V.graph.removed_operations.add(node.get_name())
+                for read in node.read_writes.reads:
+                    users = self.name_to_buf[read.name].users
+                    self.name_to_buf[read.name].users = [
+                        u for u in users if u.node.get_name() != node.get_name()
+                    ]
 
         self.nodes = list(reversed(updated_nodes))
 
