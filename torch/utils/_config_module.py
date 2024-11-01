@@ -9,7 +9,17 @@ import unittest
 import warnings
 from dataclasses import dataclass
 from types import FunctionType, ModuleType
-from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    get_type_hints,
+    List,
+    NoReturn,
+    Optional,
+    Set,
+    Union,
+)
 from typing_extensions import deprecated
 from unittest import mock
 
@@ -28,6 +38,15 @@ def install_config_module(module: ModuleType) -> None:
     class ConfigModuleInstance(ConfigModule):
         _bypass_keys = set({"_is_dirty", "_hash_digest"})
 
+    def get_annotated_type(source: Union[ModuleType, type], key: str) -> Optional[type]:
+        """Get type annotation for a given attribute if it exists."""
+        try:
+            type_hints = get_type_hints(source)
+            return type_hints.get(key)
+        except Exception:
+            # get_type_hints can fail for various reasons (missing imports, etc)
+            return None
+
     def visit(
         source: Union[ModuleType, type],
         dest: Union[ModuleType, SubConfigProxy],
@@ -44,7 +63,8 @@ def install_config_module(module: ModuleType) -> None:
 
             name = f"{prefix}{key}"
             if isinstance(value, CONFIG_TYPES):
-                config[name] = _ConfigEntry(default=value)
+                annotated_type = get_annotated_type(source, key)
+                config[name] = _ConfigEntry(default=value, value_type=annotated_type)
                 if dest is module:
                     delattr(module, key)
             elif isinstance(value, type):
@@ -120,9 +140,23 @@ _UNSET_SENTINEL = object()
 class _ConfigEntry:
     # The default value specified in the configuration
     default: Any
+    # The type of the configuration value
+    value_type: type
     # The value specified by the user when they overrode the configuration
     # _UNSET_SENTINEL indicates the value is not set.
     user_override: Any = _UNSET_SENTINEL
+
+    def __init__(self, default: Any, value_type: Optional[type] = None):
+        self.default = default
+        self.value_type = value_type if value_type is not None else type(default)
+        self.user_override = _UNSET_SENTINEL
+
+    def __post_init__(self):
+        # Validate that the default value matches the specified type
+        if not isinstance(self.default, self.value_type) and self.default is not None:
+            raise TypeError(
+                f"Default value {self.default} does not match specified type {self.value_type}"
+            )
 
 
 class ConfigModule(ModuleType):
