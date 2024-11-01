@@ -29,6 +29,7 @@ from weakref import ReferenceType
 import torch
 import torch._logging
 from torch._C._dynamo.guards import GlobalStateGuard
+from torch._C._dynamo.eval_frame import skip_code_recursive_flag
 from torch._dynamo.distributed import get_compile_pg
 from torch._dynamo.utils import CompileTimeInstructionCounter
 from torch._guards import compile_context, CompileContext, CompileId, tracing
@@ -58,7 +59,6 @@ from .bytecode_analysis import remove_dead_code, remove_pointless_jumps
 from .bytecode_transformation import (
     check_inst_exn_tab_entries_valid,
     Instruction,
-    is_generator,
     propagate_inst_exn_table_entries,
     transform_code_object,
 )
@@ -504,8 +504,16 @@ class ConvertFrameAssert:
             # len keyword in LIST_LEN guard.
             return None
 
-        if is_generator(code):
-            unimplemented("generator")
+        is_ctx_manager = lambda x: (
+            isinstance(x, contextlib._GeneratorContextManager) or
+            '_GeneratorContextManager' in str(type(x))
+        )
+
+        if frame.f_code.co_name in ('__init__', '__enter__', '__exit__') and \
+                'self' in frame.f_locals.keys() and \
+                is_ctx_manager(frame.f_locals['self']):
+            # print(f'skipping {frame.f_code.co_name=}')
+            return skip_code_recursive_flag
 
         if not has_tensor_in_frame(frame):
             return None
@@ -1362,6 +1370,12 @@ class CatchErrorsWrapper:
         frame_state: Dict[str, Union[int, FrameStateSizeEntry]],
     ) -> Optional[GuardedCode]:
         assert frame_state is not None
+
+        # print(f'tracing frame {frame.f_code.co_name=}', flush=True)
+        # _next = next
+
+        # if frame.f_code.co_name == '__exit__':
+        #     breakpoint()
 
         is_skipfile = trace_rules.check(frame.f_code)
         if sys.version_info >= (3, 13):
