@@ -397,15 +397,15 @@ __device__ __attribute__((noinline)) __attribute__((weak)) void __assert_fail(
 #endif // __SYCL_DEVICE_ONLY__
 }
 #endif // NDEBUG
-#if defined(__QNX__) // Temporary. We still need to support compiling with Musl.
+#if defined(__QNX__)
 #define CUDA_KERNEL_ASSERT(cond)                                         \
   if (C10_UNLIKELY(!(cond))) {                                           \
-    __assert(                                                       \
+    __assert(                                                            \
         #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
   }
 #define SYCL_KERNEL_ASSERT(cond)                                         \
   if (C10_UNLIKELY(!(cond))) {                                           \
-    __assert(                                                       \
+    __assert(                                                            \
         #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
   }
 #else
