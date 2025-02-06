@@ -51,6 +51,7 @@ TEST(MobileProfiler, ModuleHierarchy) {
   inputs.emplace_back(at::rand({64, 64}));
   std::string trace_file_name("/tmp/test_trace.trace");
 
+  mobile::Module bc = _load_for_mobile(testModelFile);
   {
     KinetoEdgeCPUProfiler profiler(
         bc,
