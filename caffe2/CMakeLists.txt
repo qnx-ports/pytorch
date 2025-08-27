@@ -561,7 +561,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 # Enable conditional FP16 arithmetic intrinsics
-if(CPU_AARCH64 AND LINUX)
+if(CPU_AARCH64 AND (LINUX OR QNX))
 set_source_files_properties(${TORCH_ROOT}/aten/src/ATen/native/BlasKernel.cpp PROPERTIES COMPILE_FLAGS "-march=armv8.2-a+fp16")
 endif()
 
