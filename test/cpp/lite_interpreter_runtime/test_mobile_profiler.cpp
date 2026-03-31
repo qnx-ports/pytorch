@@ -37,9 +37,14 @@ bool checkMetaData(
 } // namespace
 
 TEST(MobileProfiler, ModuleHierarchy) {
+#if defined(__QNX__)
+  // Don't compile an absolute path when building for a target.
+  auto testModelFile = "to_be_profiled_module.ptl";
+#else
   std::string filePath(__FILE__);
   auto testModelFile = filePath.substr(0, filePath.find_last_of("/\\") + 1);
   testModelFile.append("to_be_profiled_module.ptl");
+#endif
 
   std::vector<IValue> inputs;
   inputs.emplace_back(at::rand({64, 64}));
@@ -90,9 +95,14 @@ TEST(MobileProfiler, ModuleHierarchy) {
 }
 
 TEST(MobileProfiler, Backend) {
+#if defined(__QNX__)
+  // Don't compile an absolute path when building for a target.
+  auto testModelFile = "test_backend_for_profiling.ptl";
+#else
   std::string filePath(__FILE__);
   auto testModelFile = filePath.substr(0, filePath.find_last_of("/\\") + 1);
   testModelFile.append("test_backend_for_profiling.ptl");
+#endif
 
   std::vector<IValue> inputs;
   inputs.emplace_back(at::rand({64, 64}));
@@ -125,9 +135,14 @@ TEST(MobileProfiler, Backend) {
 }
 
 TEST(MobileProfiler, BackendMemoryEvents) {
+#if defined(__QNX__)
+  // Don't compile an absolute path when building for a target.
+  auto testModelFile = "test_backend_for_profiling.ptl";
+#else
   std::string filePath(__FILE__);
   auto testModelFile = filePath.substr(0, filePath.find_last_of("/\\") + 1);
   testModelFile.append("test_backend_for_profiling.ptl");
+#endif
 
   std::vector<IValue> inputs;
   inputs.emplace_back(at::rand({64, 64}));

@@ -581,8 +581,11 @@ list(APPEND ATen_MOBILE_BENCHMARK_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/tensor_add.cpp)
 list(APPEND ATen_MOBILE_BENCHMARK_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/quantize_per_channel.cpp)
-list(APPEND ATen_MOBILE_BENCHMARK_SRCS
-  ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/stateful_conv1d.cpp)
+# Uses disabled apis
+if(NOT INTERN_DISABLE_MOBILE_INTERP)
+  list(APPEND ATen_MOBILE_BENCHMARK_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/stateful_conv1d.cpp)
+endif()
 
 # Pass source, includes, and libs to parent
 set(ATen_CORE_SRCS ${ATen_CORE_SRCS} PARENT_SCOPE)

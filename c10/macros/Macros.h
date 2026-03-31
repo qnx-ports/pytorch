@@ -397,6 +397,18 @@ __device__ __attribute__((noinline)) __attribute__((weak)) void __assert_fail(
 #endif // __SYCL_DEVICE_ONLY__
 }
 #endif // NDEBUG
+#if defined(__QNX__)
+#define CUDA_KERNEL_ASSERT(cond)                                         \
+  if (C10_UNLIKELY(!(cond))) {                                           \
+    __assert(                                                            \
+        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+  }
+#define SYCL_KERNEL_ASSERT(cond)                                         \
+  if (C10_UNLIKELY(!(cond))) {                                           \
+    __assert(                                                            \
+        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+  }
+#else
 #define CUDA_KERNEL_ASSERT(cond)                                         \
   if (C10_UNLIKELY(!(cond))) {                                           \
     __assert_fail(                                                       \
@@ -407,6 +419,7 @@ __device__ __attribute__((noinline)) __attribute__((weak)) void __assert_fail(
     __assert_fail(                                                       \
         #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
   }
+#endif // __QNX__
 #endif // __APPLE__
 
 #ifdef __APPLE__

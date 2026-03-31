@@ -7,7 +7,9 @@
 #if HAS_DEMANGLE
 
 #include <cxxabi.h>
+#if !defined(__QNX__)
 #include <execinfo.h>
+#endif
 
 namespace c10 {
 
