@@ -21,6 +21,11 @@
 #define thp_bswap16(x) OSSwapInt16(x)
 #define thp_bswap32(x) OSSwapInt32(x)
 #define thp_bswap64(x) OSSwapInt64(x)
+#elif defined(__QNX__)
+#include <gulliver.h>
+#define thp_bswap16(x) __builtin_bswap16(x)
+#define thp_bswap32(x) __builtin_bswap32(x)
+#define thp_bswap64(x) __builtin_bswap64(x)
 #elif defined(__GNUC__) && !defined(__MINGW32__)
 #include <byteswap.h>
 #define thp_bswap16(x) bswap_16(x)

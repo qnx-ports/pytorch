@@ -545,6 +545,40 @@ __host__ __device__
     abort();                     \
   }
 #else
+#if defined(__QNX__)
+#define CUDA_KERNEL_ASSERT(cond)                                         \
+  if (C10_UNLIKELY(!(cond))) {                                           \
+    __assert(                                                       \
+        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+  }
+#define CUDA_KERNEL_ASSERT_MSG(cond, msg)                              \
+  if (C10_UNLIKELY(!(cond))) {                                         \
+    __assert(                                                     \
+        msg, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+  }
+#define CUDA_KERNEL_ASSERT_PRINTF(cond, msg, ...)                        \
+  if (C10_UNLIKELY(!(cond))) {                                           \
+    printf(                                                            \
+        "[CUDA_KERNEL_ASSERT] " __FILE__ ":" C10_STRINGIZE(            \
+            __LINE__) ": %s: block: [%d,%d,%d], thread: [%d,%d,%d]: "  \
+            "Assertion failed: `" #cond "`: " msg "\n",                \
+        __func__,                                                      \
+        blockIdx.x,                                                    \
+        blockIdx.y,                                                    \
+        blockIdx.z,                                                    \
+        threadIdx.x,                                                   \
+        threadIdx.y,                                                   \
+        threadIdx.z,                                                   \
+        ##__VA_ARGS__); \
+    __assert(                                                       \
+        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+  }
+#define SYCL_KERNEL_ASSERT(cond)                                         \
+  if (C10_UNLIKELY(!(cond))) {                                           \
+    __assert(                                                       \
+        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+  }
+#else
 #define CUDA_KERNEL_ASSERT(cond)                                         \
   if (C10_UNLIKELY(!(cond))) {                                           \
     __assert_fail(                                                       \
@@ -577,6 +611,7 @@ __host__ __device__
     __assert_fail(                                                       \
         #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
   }
+#endif // __QNX__
 #endif //  C10_USE_ROCM_KERNEL_ASSERT && USE_ROCM
 #endif // __APPLE__
 

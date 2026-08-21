@@ -56,7 +56,11 @@ static void setSignalHandler(
     struct sigaction* old_sa_ptr) {
   struct sigaction sa{};
   sa.sa_sigaction = handler;
+#ifndef SA_RESTART
+  sa.sa_flags = SA_SIGINFO | SA_NOCLDSTOP | SA_NODEFER;
+#else
   sa.sa_flags = SA_RESTART | SA_SIGINFO | SA_NOCLDSTOP | SA_NODEFER;
+#endif
   if (sigemptyset(&sa.sa_mask) != 0 ||
       sigaction(signal, &sa, old_sa_ptr) != 0) {
     std::ostringstream oss;

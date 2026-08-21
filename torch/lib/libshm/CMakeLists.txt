@@ -66,6 +66,9 @@ else()
   # we need to link directly to c10 here otherwise we miss symbols
   target_link_libraries(torch_shm_manager PRIVATE shm c10)
 endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "QNX")
+  target_link_libraries(torch_shm_manager PRIVATE socket)
+endif()
 set_target_properties(torch_shm_manager PROPERTIES
   INSTALL_RPATH "${_rpath_portable_origin}/../lib")
 

@@ -27,6 +27,12 @@ endif()
 # ---[ Project and semantic versioning.
 project(Torch CXX C)
 
+# Enable whole archive for CXX on QNXOS
+if(CMAKE_SYSTEM_NAME STREQUAL "QNX")
+set(CMAKE_CXX_LINK_LIBRARY_USING_WHOLE_ARCHIVE "LINKER:--whole-archive,<LINK_ITEM>,--no-whole-archive")
+set(CMAKE_CXX_LINK_LIBRARY_USING_WHOLE_ARCHIVE_SUPPORTED TRUE)
+endif()
+
 # When built via scikit-build-core, Python_EXECUTABLE is already set.
 # For standalone cmake invocations, find it via find_package.
 find_package(Python COMPONENTS Interpreter REQUIRED)
@@ -186,7 +192,7 @@ set(CPU_RISCV OFF)
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "(AMD64|x86_64)")
   set(CPU_INTEL ON)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|aarch64le)")
   set(CPU_AARCH64 ON)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ppc64le)")
   set(CPU_POWER ON)
@@ -915,7 +921,7 @@ include(ExternalProject)
 
 # ---[ Dependencies ---[ FBGEMM doesn't work on x86 32bit and
 # CMAKE_SYSTEM_PROCESSOR thinks its 64bit
-if(USE_FBGEMM AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|aarch64)$")
+if(USE_FBGEMM AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|aarch64|aarch64le)$")
   message(WARNING
     "x86_64 or aarch64 required for FBGEMM. "
     "Not compiling with FBGEMM. "
@@ -1028,7 +1034,7 @@ endif()
 
 # Enable sleef on Arm(R) architecture by default (except Android)
 if((NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Android")
-  AND("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64"))
+  AND("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64|aarch64le"))
   string(APPEND CMAKE_CXX_FLAGS " -DAT_BUILD_ARM_VEC256_WITH_SLEEF")
   add_definitions(-DAT_BUILD_ARM_VEC256_WITH_SLEEF)
 endif()
@@ -1183,7 +1189,7 @@ if(NOT MSVC)
   endif()
   append_cxx_flag_if_supported("-Wno-maybe-uninitialized" CMAKE_CXX_FLAGS)
   append_cxx_flag_if_supported("-fstandalone-debug" CMAKE_CXX_FLAGS_DEBUG)
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|aarch64le" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     if(CMAKE_BUILD_TYPE MATCHES Debug)
       message(Warning "Applying -Og optimization for aarch64 GCC debug build to workaround ICE")
     endif()
@@ -1196,7 +1202,7 @@ if(NOT MSVC)
   # aarch64 C++ stack unwinding uses frame-pointer chain walking, so frame
   # pointers must be present in all build types.  The cost is negligible on
   # aarch64 (31 GPRs vs x86-64's 16, so dedicating x29 rarely spills).
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|aarch64le")
     append_cxx_flag_if_supported("-fno-omit-frame-pointer" CMAKE_CXX_FLAGS)
   endif()
   append_cxx_flag_if_supported("-fno-math-errno" CMAKE_CXX_FLAGS)
@@ -1296,7 +1302,7 @@ if(ANDROID AND (NOT ANDROID_DEBUG_SYMBOLS))
   endif()
 endif()
 
-if(NOT APPLE AND UNIX)
+if(NOT APPLE AND NOT QNX AND UNIX)
   list(APPEND Caffe2_DEPENDENCY_LIBS dl)
 endif()
 

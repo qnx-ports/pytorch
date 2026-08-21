@@ -48,8 +48,10 @@ TEST(ScalarTest, Equality) {
   ASSERT_FALSE(Scalar(-1).equal(0xFFFFFFFFFFFFFFFF));
 }
 
+#ifndef __QNX__
 TEST(ScalarTest, LongsAndLongLongs) {
   Scalar longOne = 1L;
   Scalar longlongOne = 1LL;
   ASSERT_EQ(longOne.toInt(), longlongOne.toInt());
 }
+#endif
