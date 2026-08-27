@@ -528,6 +528,8 @@ def get_submodule_folders() -> list[Path]:
 
 
 def check_submodules() -> None:
+    if os.getenv("CMAKE_SYSTEM_NAME") == "QNX":
+        return
     def check_for_files(folder: Path, files: list[str]) -> None:
         if not any((folder / f).exists() for f in files):
             report("Could not find any of {} in {}".format(", ".join(files), folder))
